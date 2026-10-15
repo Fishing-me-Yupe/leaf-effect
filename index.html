@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaf Blizzard | 葉吹雪エフェクト</title>
+<style>
+  :root { 
+    --leaf-color: #78b84a; 
+    --bg-color: #00ff00;
+    /* 外部読み込みに依存せず、内蔵したSVGマスクデータ */
+    --leaf-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,0 68,18 91,25 76,43 100,54 73,63 65,83 50,100 35,83 27,63 0,54 24,43 9,25 32,18' fill='black'/></svg>");
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; }
+  body { background:var(--bg-color); }
+  #stage { position:fixed; inset:0; overflow:hidden; background:var(--bg-color); isolation:isolate; }
+  .leaf {
+    position:absolute; left:0; top:0; width:var(--size); height:calc(var(--size) * 1.15);
+    background:var(--leaf-color);
+    -webkit-mask: var(--leaf-mask) center / contain no-repeat;
+    mask: var(--leaf-mask) center / contain no-repeat;
+    opacity:1; pointer-events:none; will-change:transform;
+    animation: drift var(--duration) linear var(--delay) infinite;
+  }
+  @keyframes drift {
+    0% { transform: translate3d(var(--start-x), var(--start-y), 0) rotate(var(--rot0)) scale(var(--scale)); }
+    25% { transform: translate3d(calc(var(--start-x) + var(--move-x) * 0.25 + var(--sway1)), calc(var(--start-y) + var(--move-y) * 0.25), 0) rotate(calc(var(--rot0) + 100deg)) scale(var(--scale)); }
+    50% { transform: translate3d(calc(var(--start-x) + var(--move-x) * 0.5 + var(--sway2)), calc(var(--start-y) + var(--move-y) * 0.5), 0) rotate(calc(var(--rot0) + 210deg)) scale(var(--scale)); }
+    75% { transform: translate3d(calc(var(--start-x) + var(--move-x) * 0.75 + var(--sway3)), calc(var(--start-y) + var(--move-y) * 0.75), 0) rotate(calc(var(--rot0) + 300deg)) scale(var(--scale)); }
+    100% { transform: translate3d(calc(var(--start-x) + var(--move-x)), calc(var(--start-y) + var(--move-y)), 0) rotate(calc(var(--rot0) + 420deg)) scale(var(--scale)); }
+  }
+  #panel {
+    position:fixed; z-index:9999; top:12px; left:12px; width:min(330px,calc(100vw - 24px));
+    color:#f7f7f7; background:rgba(18,20,24,.9); border:1px solid rgba(255,255,255,.18);
+    border-radius:14px; padding:14px 15px; box-shadow:0 8px 28px #0003; backdrop-filter:blur(10px);
+    max-height:calc(100vh - 24px); overflow:auto;
+  }
+  #panel h1 { font-size:16px; margin:0 0 10px; }
+  .field { display:grid; grid-template-columns:1fr auto; align-items:center; gap:8px; margin:11px 0; }
+  .field label { font-size:13px; }
+  .field output { font-size:12px; color:#d7dce3; min-width:48px; text-align:right; }
+  input[type="range"] { grid-column:1 / -1; width:100%; accent-color:#9ed477; }
+  input[type="color"] { width:46px; height:28px; border:0; padding:0; background:none; }
+  .color-row { display:flex; justify-content:space-between; align-items:center; margin:10px 0; font-size:13px; }
+  .buttons { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+  button { border:1px solid #ffffff35; border-radius:8px; padding:8px 10px; color:#fff; background:#ffffff14; cursor:pointer; font-size:12px; }
+  button:hover { background:#ffffff25; }
+  .hint { color:#c5cad2; font-size:11px; line-height:1.5; margin:10px 0 0; }
+  .hidden #panel { display:none; }
+  #toggle {
+    position:fixed; z-index:10000; right:14px; top:14px;
+    border:2px solid #fff; border-radius:999px; padding:11px 15px;
+    color:#fff; background:#17202b; box-shadow:0 3px 14px #0008;
+    font-size:13px; font-weight:700;
+  }
+  body.hidden #toggle { display:block; }
+</style>
+</head>
+<body>
+<div id="stage" aria-label="葉吹雪エフェクト"></div>
+<button id="toggle" type="button">設定を隠す</button>
+<section id="panel">
+  <h1>🍃 葉吹雪エフェクト設定</h1>
+  <div class="color-row"><label for="leafColor">葉の色</label><input id="leafColor" type="color" value="#78b84a"></div>
+  <div class="color-row"><label for="bgColor">背景色（単色・切り抜き用）</label><input id="bgColor" type="color" value="#00ff00"></div>
+  <div class="field"><label for="amount">葉の量</label><output id="amountOut">180 枚</output><input id="amount" type="range" min="20" max="600" step="10" value="180"></div>
+  <div class="field"><label for="speed">移動速度</label><output id="speedOut">標準</output><input id="speed" type="range" min="3" max="18" step=".5" value="8"></div>
+  <div class="field"><label for="direction">吹雪の方向（角度）</label><output id="directionOut">45° (右下)</output><input id="direction" type="range" min="0" max="360" step="1" value="45"></div>
+  <div class="field"><label for="wind">風の勢い（移動距離）</label><output id="windOut">強め</output><input id="wind" type="range" min="10" max="200" step="5" value="100"></div>
+  <div class="field"><label for="size">葉の大きさ</label><output id="sizeOut">標準</output><input id="size" type="range" min="8" max="100" step="2" value="42"></div>
+  <div class="field"><label for="sway">横揺れ</label><output id="swayOut">強め</output><input id="sway" type="range" min="0" max="100" step="5" value="65"></div>
+  <div class="buttons">
+    <button id="regen" type="button">葉を再配置</button>
+    <button id="hide" type="button">設定を隠す</button>
+    <button id="show" type="button">設定を表示</button>
+    <button id="fullscreen" type="button">全画面表示</button>
+  </div>
+  <p class="hint">SVGデータを直接内蔵しているため、インターネット接続なしでも確実に描画されます。OBSなどのブラウザソースとしてもそのままご利用いただけます。</p>
+</section>
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const root = document.documentElement;
+  const $ = id => document.getElementById(id);
+  const rand = (a,b) => Math.random()*(b-a)+a;
+
+  function buildLeaves() {
+    stage.replaceChildren();
+    const count = Number($('amount').value);
+    const speed = Number($('speed').value);
+    const angleDeg = Number($('direction').value);
+    const windDist = Number($('wind').value);
+    const baseSize = Number($('size').value);
+    const sway = Number($('sway').value);
+    
+    const w = window.innerWidth, h = window.innerHeight;
+    
+    // 角度（360°）をラジアンに変換
+    const rad = angleDeg * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // 全体の移動ベクトル（風の勢いと角度に基づく）
+    const totalMoveDist = Math.max(w, h) * (windDist / 50);
+    const moveX = cos * totalMoveDist;
+    const moveY = sin * totalMoveDist;
+
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('i');
+      el.className = 'leaf';
+      
+      const size = baseSize * rand(.75, 1.25);
+      const duration = rand(100 / speed * .65, 100 / speed * 1.4);
+      
+      // 画面のどこから出現させるか（進行方向の逆側からランダムにばら撒く）
+      const startX = rand(-w * 0.5, w * 1.5);
+      const startY = rand(-h * 0.5, h * 1.5);
+
+      const swayAmount = (sway / 100) * rand(10, 50);
+
+      el.style.setProperty('--size', size + 'px');
+      el.style.setProperty('--scale', rand(.65, 1.2));
+      el.style.setProperty('--duration', duration + 's');
+      el.style.setProperty('--delay', (-rand(0, duration)) + 's');
+      
+      el.style.setProperty('--start-x', startX + 'px');
+      el.style.setProperty('--start-y', startY + 'px');
+      el.style.setProperty('--move-x', moveX + 'px');
+      el.style.setProperty('--move-y', moveY + 'px');
+      
+      el.style.setProperty('--sway1', rand(-swayAmount, swayAmount) + 'px');
+      el.style.setProperty('--sway2', rand(-swayAmount, swayAmount) + 'px');
+      el.style.setProperty('--sway3', rand(-swayAmount, swayAmount) + 'px');
+      el.style.setProperty('--rot0', rand(-180, 180) + 'deg');
+      
+      frag.appendChild(el);
+    }
+    stage.appendChild(frag);
+  }
+
+  function updateColors() {
+    root.style.setProperty('--leaf-color', $('leafColor').value);
+    root.style.setProperty('--bg-color', $('bgColor').value);
+  }
+
+  function updateLabels() {
+    $('amountOut').textContent = $('amount').value + ' 枚';
+    $('speedOut').textContent = Number($('speed').value) <= 5 ? 'ゆっくり' : Number($('speed').value) >= 13 ? '高速' : '標準';
+    
+    const angle = Number($('direction').value);
+    let dirName = '';
+    if (angle >= 337.5 || angle < 22.5) dirName = ' (右へ)';
+    else if (angle < 67.5) dirName = ' (右下)';
+    else if (angle < 112.5) dirName = ' (下へ)';
+    else if (angle < 157.5) dirName = ' (左下)';
+    else if (angle < 202.5) dirName = ' (左へ)';
+    else if (angle < 247.5) dirName = ' (左上)';
+    else if (angle < 292.5) dirName = ' (上へ)';
+    else if (angle < 337.5) dirName = ' (右上)';
+    $('directionOut').textContent = angle + '°' + dirName;
+
+    $('windOut').textContent = Number($('wind').value) < 50 ? '弱め' : Number($('wind').value) > 130 ? '非常に強い' : '強め';
+    $('sizeOut').textContent = Number($('size').value) < 25 ? '小さめ' : Number($('size').value) > 70 ? '大きめ' : '標準';
+    $('swayOut').textContent = Number($('sway').value) < 30 ? '弱め' : Number($('sway').value) > 70 ? '非常に強い' : '強め';
+  }
+
+  ['leafColor', 'bgColor'].forEach(id => $(id).addEventListener('input', updateColors));
+  ['amount', 'speed', 'direction', 'wind', 'size', 'sway'].forEach(id => {
+    $(id).addEventListener('input', () => { updateLabels(); buildLeaves(); });
+  });
+
+  $('regen').addEventListener('click', buildLeaves);
+
+  function hidePanel() {
+    document.body.classList.add('hidden');
+    $('toggle').textContent = '⚙ 設定を表示';
+    $('toggle').setAttribute('aria-label', '設定パネルを表示');
+  }
+  function showPanel() {
+    document.body.classList.remove('hidden');
+    $('toggle').textContent = '✕ 設定を隠す';
+    $('toggle').setAttribute('aria-label', '設定パネルを隠す');
+  }
+
+  $('hide').addEventListener('click', hidePanel);
+  $('show').addEventListener('click', showPanel);
+  $('toggle').addEventListener('click', () => document.body.classList.contains('hidden') ? showPanel() : hidePanel());
+  $('toggle').textContent = '✕ 設定を隠す';
+
+  $('fullscreen').addEventListener('click', () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  });
+
+  window.addEventListener('resize', buildLeaves);
+  updateColors(); 
+  updateLabels(); 
+  buildLeaves();
+})();
+</script>
+</body>
+</html>
